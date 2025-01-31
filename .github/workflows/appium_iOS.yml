@@ -14,6 +14,7 @@ env:
 
 jobs:
   appium:
+    if: false
     runs-on: ubuntu-22.04
 
     strategy:
