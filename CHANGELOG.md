@@ -1,3 +1,7 @@
+## 3.7.1
+
+- Fixed `reading charAt` error in `asyncWrapper.js`
+
 ## 3.7.0
 
 This release introduces major new features and internal refactoring. It is an important step toward the 4.0 release planned soon, which will remove all deprecations introduced in 3.7.
