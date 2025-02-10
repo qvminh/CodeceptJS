@@ -4,9 +4,9 @@ This release introduces major new features and internal refactoring. It is an im
 
 🛩️ _Features_
 
-### 🔥 **[Element functions](./els)**
+### 🔥 **Native Element Functions**
 
-A new API for direct element interactions has been introduced. This API provides low-level element manipulation functions for more granular control over element interactions and assertions:
+A new [Els API](./els) for direct element interactions has been introduced. This API provides low-level element manipulation functions for more granular control over element interactions and assertions:
 
 - `element()` - perform custom operations on first matching element
 - `eachElement()` - iterate and perform operations on each matching element
@@ -49,7 +49,7 @@ Scenario('element functions demo', async ({ I }) => {
 
 ### 🔮 **Effects introduced**
 
-Effects is a new concept that encompasses all functions that can modify scenario flow. These functions are now part of a single module. Previously, they were used via plugins like `tryTo` and `retryTo`. Now, it is recommended to import them directly:
+[Effects](./effects) is a new concept that encompasses all functions that can modify scenario flow. These functions are now part of a single module. Previously, they were used via plugins like `tryTo` and `retryTo`. Now, it is recommended to import them directly:
 
 ```js
 const { tryTo, retryTo } = require('codeceptjs/effects')
