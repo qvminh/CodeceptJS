@@ -1,3 +1,329 @@
+## 3.7.0
+
+This release introduces major new features and internal refactoring. It is an important step toward the 4.0 release planned soon, which will remove all deprecations introduced in 3.7.
+
+🛩️ _Features_
+
+### 🔥 **Native Element Functions**
+
+A new [Els API](./els) for direct element interactions has been introduced. This API provides low-level element manipulation functions for more granular control over element interactions and assertions:
+
+- `element()` - perform custom operations on first matching element
+- `eachElement()` - iterate and perform operations on each matching element
+- `expectElement()` - assert condition on first matching element
+- `expectAnyElement()` - assert condition matches at least one element
+- `expectAllElements()` - assert condition matches all elements
+
+Example using all element functions:
+
+```js
+const { element, eachElement, expectElement, expectAnyElement, expectAllElements } = require('codeceptjs/els')
+
+// ...
+
+Scenario('element functions demo', async ({ I }) => {
+  // Get attribute of first button
+  const attr = await element('.button', async el => await el.getAttribute('data-test'))
+
+  // Log text of each list item
+  await eachElement('.list-item', async (el, idx) => {
+    console.log(`Item ${idx}: ${await el.getText()}`)
+  })
+
+  // Assert first submit button is enabled
+  await expectElement('.submit', async el => await el.isEnabled())
+
+  // Assert at least one product is in stock
+  await expectAnyElement('.product', async el => {
+    return (await el.getAttribute('data-status')) === 'in-stock'
+  })
+
+  // Assert all required fields have required attribute
+  await expectAllElements('.required', async el => {
+    return (await el.getAttribute('required')) !== null
+  })
+})
+```
+
+[Els](./els) functions expose the native API of Playwright, WebDriver, and Puppeteer helpers. The actual `el` API will differ depending on which helper is used, which affects test code interoperability.
+
+### 🔮 **Effects introduced**
+
+[Effects](./effects) is a new concept that encompasses all functions that can modify scenario flow. These functions are now part of a single module. Previously, they were used via plugins like `tryTo` and `retryTo`. Now, it is recommended to import them directly:
+
+```js
+const { tryTo, retryTo } = require('codeceptjs/effects')
+
+Scenario(..., ({ I }) => {
+  I.amOnPage('/')
+  // tryTo returns boolean if code in function fails
+  // use it to execute actions that may fail but not affect the test flow
+  // for instance, for accepting cookie banners
+  const isItWorking = tryTo(() => I.see('It works'))
+
+  // run multiple steps and retry on failure
+  retryTo(() => {
+    I.click('Start Working!');
+    I.see('It works')
+  }, 5);
+})
+```
+
+Previously `tryTo` and `retryTo` were available globally via plugins. This behavior is deprecated as of 3.7 and will be removed in 4.0. Import these functions via effects instead. Similarly, `within` will be moved to `effects` in 4.0.
+
+### ✅ `check` command added
+
+```
+npx codeceptjs check
+```
+
+This command can be executed locally or in CI environments to verify that tests can be executed correctly.
+
+It checks:
+
+- configuration
+- tests
+- helpers
+
+And will attempt to open and close a browser if a corresponding helper is enabled. If something goes wrong, the command will fail with a message. Run `npx codeceptjs check` on CI before actual tests to ensure everything is set up correctly and all services and browsers are accessible.
+
+For GitHub Actions, add this command:
+
+```yaml
+steps:
+  # ...
+  - name: check configuration and browser
+    run: npx codeceptjs check
+
+  - name: run codeceptjs tests
+    run: npx codeceptjs run-workers 4
+```
+
+### 👨‍🔬 **analyze plugin introduced**
+
+This [AI plugin](./plugins#analyze) analyzes failures in test runs and provides brief summaries. For more than 5 failures, it performs cluster analysis and aggregates failures into groups, attempting to find common causes. It is recommended to use Deepseek R1 model or OpenAI o3 for better reasoning on clustering:
+
+```js
+• SUMMARY The test failed because the expected text "Sign in" was not found on the page, indicating a possible issue with HTML elements or their visibility.
+• ERROR expected web application to include "Sign in"
+• CATEGORY HTML / page elements (not found, not visible, etc)
+• URL http://127.0.0.1:3000/users/sign_in
+```
+
+For fewer than 5 failures, they are analyzed individually. If a visual recognition model is connected, AI will also scan screenshots to suggest potential failure causes (missing button, missing text, etc).
+
+This plugin should be paired with the newly added [`pageInfo` plugin](./plugins/#pageInfo) which stores important information like URL, console logs, and error classes for further analysis.
+
+### 👨‍💼 **autoLogin plugin** renamed to **auth plugin**
+
+[`auth`](/plugins#auth) is the new name for the autoLogin plugin and aims to solve common authorization issues. In 3.7 it can use Playwright's storage state to load authorization cookies in a browser on start. So if a user is already authorized, a browser session starts with cookies already loaded for this user. If you use Playwright, you can enable this behavior using the `loginAs` method inside a `BeforeSuite` hook:
+
+```js
+BeforeSuite(({ loginAs }) => loginAs('user'))
+```
+
+The previous behavior where `loginAs` was called from a `Before` hook also works. However, cookie loading and authorization checking is performed after the browser starts.
+
+#### Metadata introduced
+
+Meta information in key-value format can be attached to Scenarios to provide more context when reporting tests:
+
+```js
+// add Jira issue to scenario
+Scenario('...', () => {
+  // ...
+}).meta('JIRA', 'TST-123')
+
+// or pass meta info in the beginning of scenario:
+Scenario('my test linked to Jira', meta: { issue: 'TST-123' }, () => {
+  // ...
+})
+```
+
+By default, Playwright helpers add browser and window size as meta information to tests.
+
+### 👢 Custom Steps API
+
+Custom Steps or Sections API introduced to group steps into sections:
+
+```js
+const { Section } = require('codeceptjs/steps');
+
+Scenario({ I } => {
+  I.amOnPage('/projects');
+
+  // start section "Create project"
+  Section('Create a project');
+  I.click('Create');
+  I.fillField('title', 'Project 123')
+  I.click('Save')
+  I.see('Project created')
+  // calling Section with empty param closes previous section
+  Section()
+
+  // previous section automatically closes
+  // when new section starts
+  Section('open project')
+  // ...
+});
+```
+
+To hide steps inside a section from output use `Section().hidden()` call:
+
+```js
+Section('Create a project').hidden()
+// next steps are not printed:
+I.click('Create')
+I.fillField('title', 'Project 123')
+Section()
+```
+
+Alternative syntax for closing section: `EndSection`:
+
+```js
+const { Section, EndSection } = require('codeceptjs/steps');
+
+// ...
+Scenario(..., ({ I }) =>  // ...
+
+  Section('Create a project').hidden()
+  // next steps are not printed:
+  I.click('Create');
+  I.fillField('title', 'Project 123')
+  EndSection()
+```
+
+Also available BDD-style pre-defined sections:
+
+```js
+const { Given, When, Then } = require('codeceptjs/steps');
+
+// ...
+Scenario(..., ({ I }) =>  // ...
+
+  Given('I have a project')
+  // next steps are not printed:
+  I.click('Create');
+  I.fillField('title', 'Project 123')
+
+  When('I open project');
+  // ...
+
+  Then('I should see analytics in a project')
+  //....
+```
+
+### 🥾 Step Options
+
+Better syntax to set general step options for specific tests.
+
+Use it to set timeout or retries for specific steps:
+
+```js
+const step = require('codeceptjs/steps');
+
+Scenario(..., ({ I }) =>  // ...
+  I.click('Create', step.timeout(10).retry(2));
+  //....
+```
+
+Alternative syntax:
+
+```js
+const { stepTimeout, stepRetry } = require('codeceptjs/steps');
+
+Scenario(..., ({ I }) =>  // ...
+  I.click('Create', stepTimeout(10));
+  I.see('Created', stepRetry(2));
+  //....
+```
+
+This change deprecates previous syntax:
+
+- `I.limitTime().act(...)` => replaced with `I.act(..., stepTimeout())`
+- `I.retry().act(...)` => replaced with `I.act(..., stepRetry())`
+
+Step options should be passed as the very last argument to `I.action()` call.
+
+Step options can be used to pass additional options to currently existing methods:
+
+```js
+const { stepOpts } = require('codeceptjs/steps')
+
+I.see('SIGN IN', stepOpts({ ignoreCase: true }))
+```
+
+Currently this works only on `see` and only with `ignoreCase` param.
+However, this syntax will be extended in next versions.
+
+### Test object can be injected into Scenario
+
+API for direct access to test object inside Scenario or hooks to add metadata or artifacts:
+
+```js
+BeforeSuite(({ suite }) => {
+  // no test object here, test is not created yet
+})
+
+Before(({ test }) => {
+  // add artifact to test
+  test.artifacts.myScreenshot = 'screenshot'
+})
+
+Scenario('test store-test-and-suite test', ({ test }) => {
+  // add custom meta data
+  test.meta.browser = 'chrome'
+})
+
+After(({ test }) => {})
+```
+
+Object for `suite` is also injected for all Scenario and hooks.
+
+### Notable changes
+
+- Load official Gherkin translations into CodeceptJS. See #4784 by @ebo-zig
+- 🇳🇱 `NL` translation introduced by @ebo-zig in #4784:
+- [Playwright] Improved experience to highlight and print elements in debug mode
+- `codeceptjs run` fails on CI if no tests were executed. This helps to avoid false positive checks. Use `DONT_FAIL_ON_EMPTY_RUN` env variable to disable this behavior
+- Various console output improvements
+- AI suggested fixes from `heal` plugin (which heals failing tests on the fly) shown in `run-workers` command
+- `plugin/standatdActingHelpers` replaced with `Container.STANDARD_ACTING_HELPERS`
+
+### 🐛 _Bug Fixes_
+
+- Fixed timeouts for `BeforeSuite` and `AfterSuite`
+- Fixed stucking process on session switch
+
+### 🎇 Internal Refactoring
+
+This section is listed briefly. A new dedicated page for internal API concepts will be added to documentation
+
+- File structure changed:
+  - mocha classes moved to `lib/mocha`
+  - step is split to multiple classes and moved to `lib/step`
+- Extended and exposed to public API classes for Test, Suite, Hook
+  - [Test](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/mocha/test.js)
+  - [Suite](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/mocha/suite.js)
+  - [Hook](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/mocha/hooks.js) (Before, After, BeforeSuite, AfterSuite)
+- Container:
+  - refactored to be prepared for async imports in ESM.
+  - added proxy classes to resolve circular dependencies
+- Step
+  - added different step types [`HelperStep`](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/step/helper.js), [`MetaStep`](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/step/meta.js), [`FuncStep`](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/step/func.js), [`CommentStep`](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/step/comment.js)
+  - added `step.addToRecorder()` to schedule test execution as part of global promise chain
+- [Result object](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/result.js) added
+  - `event.all.result` now sends Result object with all failures and stats included
+- `run-workers` refactored to use `Result` to send results from workers to main process
+- Timeouts refactored `listener/timeout` => [`globalTimeout`](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/listener/globalTimeout.js)
+- Reduced usages of global variables, more attributes added to [`store`](https://github.com/codeceptjs/CodeceptJS/blob/3.x/lib/store.js) to share data on current state between different parts of system
+- `events` API improved
+  - Hook class is sent as param for `event.hook.passed`, `event.hook.finished`
+  - `event.test.failed`, `event.test.finished` always sends Test. If test has failed in `Before` or `BeforeSuite` hook, event for all failed test in this suite will be sent
+  - if a test has failed in a hook, a hook name is sent as 3rd arg to `event.test.failed`
+
+---
+
 ## 3.6.10
 
 ❤️ Thanks all to those who contributed to make this release! ❤️
@@ -2442,7 +2768,7 @@ Read changelog to learn more about version 👇
 
 ```ts
 const psp = wd.grabPageScrollPosition() // $ExpectType Promise<PageScrollPosition>
-psp.then((result) => {
+psp.then(result => {
   result.x // $ExpectType number
   result.y // $ExpectType number
 })
@@ -3365,7 +3691,7 @@ This change allows using auto-completion when running a specific test.
 - [WebDriverIO][Protractor][Multiple Sessions](https://codecept.io/acceptance/#multiple-sessions). Run several browser sessions in one test. Introduced `session` command, which opens additional browser window and closes it after a test.
 
 ```js
-Scenario('run in different browsers', (I) => {
+Scenario('run in different browsers', I => {
   I.amOnPage('/hello')
   I.see('Hello!')
   session('john', () => {
@@ -3407,13 +3733,13 @@ locate('//table').find('tr').at(2).find('a').withText('Edit')
 ```js
 Feature('checkout').timeout(3000).retry(2)
 
-Scenario('user can order in firefox', (I) => {
+Scenario('user can order in firefox', I => {
   // see dynamic configuration
 })
   .config({ browser: 'firefox' })
   .timeout(20000)
 
-Scenario('this test should throw error', (I) => {
+Scenario('this test should throw error', I => {
   // I.amOnPage
 }).throws(new Error())
 ```
@@ -3522,7 +3848,7 @@ I.retry({ retries: 3, maxTimeout: 3000 }).see('Hello')
 // retry 2 times if error with message 'Node not visible' happens
 I.retry({
   retries: 2,
-  when: (err) => err.message === 'Node not visible',
+  when: err => err.message === 'Node not visible',
 }).seeElement('#user')
 ```
 
@@ -3550,7 +3876,7 @@ I.retry({
 
 ```js
 I.runOnAndroid(
-  (caps) => caps.platformVersion >= 7,
+  caps => caps.platformVersion >= 7,
   () => {
     // run code only on Android 7+
   },
@@ -3959,7 +4285,7 @@ I.say('I expect post is visible on site')
 ```js
 Feature('Complex JS Stuff', { retries: 3 })
 
-Scenario('Not that complex', { retries: 1 }, (I) => {
+Scenario('Not that complex', { retries: 1 }, I => {
   // test goes here
 })
 ```
@@ -3969,7 +4295,7 @@ Scenario('Not that complex', { retries: 1 }, (I) => {
 ```js
 Feature('Complex JS Stuff', { timeout: 5000 })
 
-Scenario('Not that complex', { timeout: 1000 }, (I) => {
+Scenario('Not that complex', { timeout: 1000 }, I => {
   // test goes here
 })
 ```

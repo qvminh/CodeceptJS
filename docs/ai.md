@@ -85,7 +85,7 @@ ai: {
     const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] })
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo-0125',
+      model: 'gpt-3.5-turbo',
       messages,
     })
 
@@ -353,6 +353,131 @@ npx codeceptjs run --ai
 
 When execution finishes, you will receive information on token usage and code suggestions proposed by AI.
 By evaluating this information you will be able to check how effective AI can be for your case.
+
+## Analyze Results
+
+When running tests with AI enabled, CodeceptJS can automatically analyze test failures and provide insights. The analyze plugin helps identify patterns in test failures and provides detailed explanations of what went wrong.
+
+Enable the analyze plugin in your config:
+
+```js
+plugins: {
+  analyze: {
+    enabled: true,
+    // analyze up to 3 failures in detail
+    analyze: 3,
+    // group similar failures when 5 or more tests fail
+    clusterize: 5,
+    // enable screenshot analysis (requires modal that can analyze  screenshots)
+    vision: false
+  }
+}
+```
+
+When tests are executed with `--ai` flag, the analyze plugin will:
+
+**Analyze Individual Failures**: For each failed test (up to the `analyze` limit), it will:
+
+- Examine the error message and stack trace
+- Review the test steps that led to the failure
+- Provide a detailed explanation of what likely caused the failure
+- Suggest possible fixes and improvements
+
+Sample Analysis report:
+
+When analyzing individual failures (less than `clusterize` threshold), the output looks like this:
+
+```
+🪄 AI REPORT:
+--------------------------------
+→ Cannot submit registration form with invalid email 👀
+
+* SUMMARY: Form submission failed due to invalid email format, system correctly shows validation message
+* ERROR: expected element ".success-message" to be visible, but it is not present in DOM
+* CATEGORY: Data errors (password incorrect, no options in select, invalid format, etc)
+* STEPS: I.fillField('#email', 'invalid-email'); I.click('Submit'); I.see('.success-message')
+* URL: /register
+
+```
+
+> The 👀 emoji indicates that screenshot analysis was performed (when `vision: true`).
+
+**Cluster Similar Failures**: When number of failures exceeds the `clusterize` threshold:
+
+- Groups failures with similar error patterns
+- Identifies common root causes
+- Suggests fixes that could resolve multiple failures
+- Helps prioritize which issues to tackle first
+
+**Categorize Failures**: Automatically classifies failures into categories like:
+
+- Browser/connection issues
+- Network errors
+- Element locator problems
+- Navigation errors
+- Code errors
+- Data validation issues
+- etc.
+
+Clusterization output:
+
+```
+🪄 AI REPORT:
+_______________________________
+
+## Group 1 🔍
+
+* SUMMARY: Element locator failures across login flow
+* CATEGORY: HTML / page elements (not found, not visible, etc)
+* ERROR: Element "#login-button" is not visible
+* STEP: I.click('#login-button')
+* SUITE: Authentication
+* TAG: @login
+* AFFECTED TESTS (4):
+    x Cannot login with valid credentials
+    x Should show error on invalid login
+    x Login button should be disabled when form empty
+    x Should redirect to dashboard after login
+
+## Group 2 🌐
+
+* SUMMARY: API timeout issues during user data fetch
+* CATEGORY: Network errors (server error, timeout, etc)
+* URL: /api/v1/users
+* ERROR: Request failed with status code 504, Gateway Timeout
+* SUITE: User Management
+* AFFECTED TESTS (3):
+    x Should load user profile data
+    x Should display user settings
+    x Should fetch user notifications
+
+## Group 3 ⚠️
+
+* SUMMARY: Form validation errors on registration page
+* CATEGORY: Data errors (password incorrect, no options in select, invalid format, etc)
+* ERROR: Expected field "password" to have error "Must be at least 8 characters"
+* STEP: I.see('Must be at least 8 characters', '.error-message')
+* SUITE: User Registration
+* TAG: @registration
+* AFFECTED TESTS (2):
+    x Should validate password requirements
+    x Should show all validation errors on submit
+```
+
+If `vision: true` is enabled and your tests take screenshots on failure, the plugin will also analyze screenshots to provide additional visual context about the failure.
+
+The analysis helps teams:
+
+- Quickly understand the root cause of failures
+- Identify patterns in failing tests
+- Prioritize fixes based on impact
+- Maintain more stable test suites
+
+Run tests with both AI and analyze enabled:
+
+```bash
+npx codeceptjs run --ai
+```
 
 ## Arbitrary Prompts
 
