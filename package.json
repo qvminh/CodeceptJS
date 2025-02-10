@@ -1,6 +1,6 @@
 {
   "name": "codeceptjs",
-  "version": "3.7.0-beta.8",
+  "version": "3.7.0-beta.19",
   "description": "Supercharged End 2 End Testing Framework for NodeJS",
   "keywords": [
     "acceptance",
@@ -31,6 +31,7 @@
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./lib/*": "./lib/*.js",
     "./els": "./lib/els.js",
     "./effects": "./lib/effects.js",
     "./steps": "./lib/steps.js"
