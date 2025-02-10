@@ -71,7 +71,7 @@ Scenario(..., ({ I }) => {
 
 Previously `tryTo` and `retryTo` were available globally via plugins. This behavior is deprecated as of 3.7 and will be removed in 4.0. Import these functions via effects instead. Similarly, `within` will be moved to `effects` in 4.0.
 
-#### **check command** added
+### ✅ `check` command added
 
 ```
 npx codeceptjs check
@@ -99,9 +99,9 @@ steps:
     run: npx codeceptjs run-workers 4
 ```
 
-### 👨‍🔬 **[analyze plugin](./plugins#analyze) introduced**
+### 👨‍🔬 **analyze plugin introduced**
 
-This AI plugin analyzes failures in test runs and provides brief summaries. For more than 5 failures, it performs cluster analysis and aggregates failures into groups, attempting to find common causes. It is recommended to use Deepseek R1 model or OpenAI o3 for better reasoning on clustering:
+This [AI plugin](./plugins#analyze) analyzes failures in test runs and provides brief summaries. For more than 5 failures, it performs cluster analysis and aggregates failures into groups, attempting to find common causes. It is recommended to use Deepseek R1 model or OpenAI o3 for better reasoning on clustering:
 
 ```js
 • SUMMARY The test failed because the expected text "Sign in" was not found on the page, indicating a possible issue with HTML elements or their visibility.
@@ -256,7 +256,7 @@ I.see('SIGN IN', stepOpts({ ignoreCase: true }))
 Currently this works only on `see` and only with `ignoreCase` param.
 However, this syntax will be extended in next versions.
 
-#### Test object can be injected into Scenario
+### Test object can be injected into Scenario
 
 API for direct access to test object inside Scenario or hooks to add metadata or artifacts:
 
