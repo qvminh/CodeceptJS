@@ -11,9 +11,10 @@ To start you need:
 3.  Do the changes.
 4.  Add/Update Test (if possible)
 5.  Update documentation
-6.  Run `npm run docs` if you change the documentation
-7.  Commit and Push to your fork
-8.  Make Pull Request
+6.  Run `npm run def` to generate types
+7.  Run `npm run docs` if you change the documentation
+8.  Commit and Push to your fork
+9.  Make Pull Request
 
 To run codeceptjs from this repo use:
 
